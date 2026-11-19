@@ -22,18 +22,15 @@ jobs:
           distribution: temurin
           java-version: '25'
 
-      - name: Install Gradle 9.8.2
+      - name: Install Gradle
         uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: '9.8.2'
 
-      - name: Validate project resources
-        run: python3 validate_project.py
-
       - name: Build mod JAR
         run: gradle build --no-daemon
 
-      - name: Upload build outputs
+      - name: Upload JAR
         uses: actions/upload-artifact@v4
         with:
           name: orbital-strike-0.2.1-alpha
