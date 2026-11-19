@@ -4,7 +4,8 @@ name: Build ORBITAL STRIKE
 on:
   workflow_dispatch:
   push:
-    branches: [ main ]
+    branches:
+      - main
 
 permissions:
   contents: read
@@ -12,28 +13,30 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout source
         uses: actions/checkout@v6
 
-      - name: Install JDK 25
+      - name: Install Java 25
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '25'
 
-      - name: Install Gradle
+      - name: Install Gradle 9.8.2
         uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: '9.8.2'
 
-      - name: Build mod JAR
+      - name: Build ORBITAL STRIKE
+        working-directory: ./orbital-strike
         run: gradle build --no-daemon
 
       - name: Upload JAR
         uses: actions/upload-artifact@v4
         with:
-          name: orbital-strike-0.2.1-alpha
-          path: build/libs/*.jar
+          name: ORBITAL-STRIKE-0.2.1
+          path: orbital-strike/build/libs/*.jar
           if-no-files-found: error
           retention-days: 14
