@@ -35,10 +35,12 @@ jobs:
           test -n "$ZIP"
           unzip -oq "$ZIP" -d source
 
-      - name: Fix Java compatibility
+      - name: Fix Java compatibility and version
         run: |
           python3 - <<'PY'
           from pathlib import Path
+          import json
+          import re
 
           roots = list(Path("source").rglob("build.gradle"))
           if not roots:
@@ -46,6 +48,29 @@ jobs:
 
           root = roots[0].parent
           print("Project:", root)
+
+          # Update mod version
+          gradle_props = root / "gradle.properties"
+          if gradle_props.exists():
+              content = gradle_props.read_text(encoding="utf-8")
+              content = re.sub(
+                  r"(?m)^mod_version=.*$",
+                  "mod_version=0.2.1",
+                  content
+              )
+              gradle_props.write_text(content, encoding="utf-8")
+              print("Updated gradle.properties")
+
+          # Update Fabric mod metadata
+          metadata = root / "src/main/resources/fabric.mod.json"
+          if metadata.exists():
+              data = json.loads(metadata.read_text(encoding="utf-8"))
+              data["version"] = "0.2.1"
+              metadata.write_text(
+                  json.dumps(data, indent=2) + "\n",
+                  encoding="utf-8"
+              )
+              print("Updated fabric.mod.json")
 
           replacements = {
               "ParticleTypes.FLASH": "ParticleTypes.EXPLOSION_EMITTER",
@@ -63,6 +88,7 @@ jobs:
               updated = original
               for old, new in replacements.items():
                   updated = updated.replace(old, new)
+
               if updated != original:
                   file.write_text(updated, encoding="utf-8")
                   count += 1
@@ -74,7 +100,7 @@ jobs:
       - name: Build mod
         run: |
           PROJECT=$(dirname "$(find source -name build.gradle -print -quit)")
-          gradle -p "$PROJECT" build --no-daemon --no-configuration-cache
+          gradle -p "$PROJECT" clean build --no-daemon --no-configuration-cache
 
       - name: Upload JAR
         uses: actions/upload-artifact@v4
