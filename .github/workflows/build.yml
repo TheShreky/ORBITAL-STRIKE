@@ -35,7 +35,7 @@ jobs:
           test -n "$ZIP"
           unzip -oq "$ZIP" -d source
 
-      - name: Fix Java compatibility and version
+      - name: Repair ORBITAL STRIKE
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -49,29 +49,39 @@ jobs:
           root = roots[0].parent
           print("Project:", root)
 
-          # Update mod version
-          gradle_props = root / "gradle.properties"
-          if gradle_props.exists():
-              content = gradle_props.read_text(encoding="utf-8")
-              content = re.sub(
-                  r"(?m)^mod_version=.*$",
-                  "mod_version=0.2.1",
-                  content
-              )
-              gradle_props.write_text(content, encoding="utf-8")
-              print("Updated gradle.properties")
+          # Update version
+          props = root / "gradle.properties"
+          content = props.read_text(encoding="utf-8")
+          content = re.sub(
+              r"(?m)^mod_version=.*$",
+              "mod_version=0.2.2",
+              content
+          )
+          props.write_text(content, encoding="utf-8")
 
-          # Update Fabric mod metadata
-          metadata = root / "src/main/resources/fabric.mod.json"
-          if metadata.exists():
-              data = json.loads(metadata.read_text(encoding="utf-8"))
-              data["version"] = "0.2.1"
-              metadata.write_text(
-                  json.dumps(data, indent=2) + "\n",
-                  encoding="utf-8"
-              )
-              print("Updated fabric.mod.json")
+          # Fix recipe ingredient format for Minecraft 26.3
+          recipe_dir = root / "src/main/resources/data/orbital_strike/recipe"
 
+          if recipe_dir.exists():
+              for file in recipe_dir.rglob("*.json"):
+                  data = json.loads(file.read_text(encoding="utf-8"))
+
+                  key = data.get("key", {})
+                  for symbol, ingredient in key.items():
+                      if isinstance(ingredient, dict):
+                          if "item" in ingredient:
+                              key[symbol] = ingredient["item"]
+                          elif "tag" in ingredient:
+                              key[symbol] = "#" + ingredient["tag"]
+
+                  data["key"] = key
+                  file.write_text(
+                      json.dumps(data, indent=2) + "\n",
+                      encoding="utf-8"
+                  )
+                  print("Fixed recipe:", file.name)
+
+          # Fix Minecraft 26.3 Java API compatibility
           replacements = {
               "ParticleTypes.FLASH": "ParticleTypes.EXPLOSION_EMITTER",
               "ParticleTypes.DRAGON_BREATH": "ParticleTypes.CLOUD",
@@ -80,21 +90,21 @@ jobs:
               "setSecondsOnFire(1)": "setRemainingFireTicks(20)",
               "setSecondsOnFire(2)": "setRemainingFireTicks(40)",
               "serverLevel.random.nextFloat()": "player.getRandom().nextFloat()",
+              '"0.2.0-alpha"': '"0.2.2"',
           }
 
-          count = 0
           for file in root.rglob("*.java"):
               original = file.read_text(encoding="utf-8")
               updated = original
+
               for old, new in replacements.items():
                   updated = updated.replace(old, new)
 
               if updated != original:
                   file.write_text(updated, encoding="utf-8")
-                  count += 1
-                  print("Patched:", file)
+                  print("Patched Java:", file.name)
 
-          print("Patched Java files:", count)
+          print("Repair completed.")
           PY
 
       - name: Build mod
@@ -102,10 +112,22 @@ jobs:
           PROJECT=$(dirname "$(find source -name build.gradle -print -quit)")
           gradle -p "$PROJECT" clean build --no-daemon --no-configuration-cache
 
-      - name: Upload JAR
+      - name: Prepare release JAR
+        run: |
+          PROJECT=$(dirname "$(find source -name build.gradle -print -quit)")
+          mkdir -p release
+          find "$PROJECT/build/libs" -maxdepth 1 -type f \
+            -name '*.jar' \
+            ! -name '*-sources.jar' \
+            ! -name '*-dev.jar' \
+            -exec cp {} release/ \;
+
+          test -n "$(find release -name '*.jar' -print -quit)"
+
+      - name: Upload final mod
         uses: actions/upload-artifact@v4
         with:
-          name: ORBITAL-STRIKE-0.2.1
-          path: source/**/build/libs/*.jar
+          name: ORBITAL-STRIKE-0.2.2
+          path: release/*.jar
           if-no-files-found: error
           retention-days: 14
