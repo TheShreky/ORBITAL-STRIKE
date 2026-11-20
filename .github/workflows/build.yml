@@ -49,6 +49,7 @@ jobs:
 
           replacements = {
               "ParticleTypes.FLASH": "ParticleTypes.EXPLOSION_EMITTER",
+              "ParticleTypes.DRAGON_BREATH": "ParticleTypes.CLOUD",
               "addCooldown(this,": "addCooldown(player.getItemInHand(hand),",
               "isOnCooldown(this)": "isOnCooldown(player.getItemInHand(hand))",
               "setSecondsOnFire(1)": "setRemainingFireTicks(20)",
