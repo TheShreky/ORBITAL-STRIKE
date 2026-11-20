@@ -4,8 +4,7 @@ name: Build ORBITAL STRIKE
 on:
   workflow_dispatch:
   push:
-    branches:
-      - main
+    branches: [main]
 
 permissions:
   contents: read
@@ -15,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout source
+      - name: Download source
         uses: actions/checkout@v6
 
       - name: Install Java 25
@@ -24,19 +23,27 @@ jobs:
           distribution: temurin
           java-version: '25'
 
-      - name: Install Gradle 9.8.2
+      - name: Install Gradle
         uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: '9.8.2'
 
-      - name: Build ORBITAL STRIKE
-        working-directory: ./orbital-strike
-        run: gradle build --no-daemon
+      - name: Extract project ZIP
+        run: |
+          mkdir source
+          ZIP=$(find . -maxdepth 1 -name '*.zip' | head -n 1)
+          test -n "$ZIP"
+          unzip -q "$ZIP" -d source
+
+      - name: Build mod
+        run: |
+          PROJECT=$(dirname "$(find source -name build.gradle -print -quit)")
+          test -n "$PROJECT"
+          gradle -p "$PROJECT" build --no-daemon
 
       - name: Upload JAR
         uses: actions/upload-artifact@v4
         with:
-          name: ORBITAL-STRIKE-0.2.1
-          path: orbital-strike/build/libs/*.jar
+          name: ORBITAL-STRIKE
+          path: source/**/build/libs/*.jar
           if-no-files-found: error
-          retention-days: 14
