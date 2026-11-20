@@ -4,7 +4,8 @@ name: Build ORBITAL STRIKE
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches:
+      - main
 
 permissions:
   contents: read
@@ -24,36 +25,35 @@ jobs:
           distribution: temurin
           java-version: '25'
 
-      - name: Install Gradle 9.8.2
+      - name: Install Gradle
         uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: '9.8.2'
 
-      - name: Extract Cosmic Edition source
+      - name: Find and extract ZIP
         shell: bash
         run: |
-          mkdir -p source
-
           ZIP="ORBITAL-STRIKE-0.3.0-COSMIC-SOURCE.zip"
 
           if [ ! -f "$ZIP" ]; then
-            echo "ERROR: Cosmic source ZIP is missing!"
+            echo "ERROR: ZIP file not found in repository root!"
             exit 1
           fi
 
+          mkdir -p source
           unzip -oq "$ZIP" -d source
 
           PROJECT="$(find source -name settings.gradle -print -quit | xargs dirname)"
 
           if [ -z "$PROJECT" ] || [ ! -f "$PROJECT/build.gradle" ]; then
-            echo "ERROR: Project folder not found!"
+            echo "ERROR: Gradle project not found inside ZIP!"
             exit 1
           fi
 
           echo "PROJECT=$PROJECT" >> "$GITHUB_ENV"
-          echo "Project found: $PROJECT"
+          echo "Found project: $PROJECT"
 
-      - name: Pin Fabric Loom version
+      - name: Configure Fabric Loom
         shell: bash
         run: |
           python3 - <<'PY'
@@ -75,10 +75,10 @@ jobs:
               content += "\nloom_version=1.19.4\n"
 
           props.write_text(content, encoding="utf-8")
-          print("Fabric Loom pinned to 1.19.4")
+          print("Fabric Loom configured")
           PY
 
-      - name: Validate resources and recipes
+      - name: Validate project resources
         run: python3 "$PROJECT/validate_project.py"
 
       - name: Build ORBITAL STRIKE
@@ -87,7 +87,7 @@ jobs:
             --no-daemon \
             --no-configuration-cache
 
-      - name: Verify generated JAR
+      - name: Prepare JAR
         shell: bash
         run: |
           mkdir -p release
@@ -101,14 +101,13 @@ jobs:
             -exec cp {} release/ \;
 
           if [ -z "$(find release -name '*.jar' -print -quit)" ]; then
-            echo "ERROR: No installable JAR was generated!"
+            echo "ERROR: No installable JAR generated!"
             exit 1
           fi
 
-          echo "Generated JAR:"
           ls -lh release/
 
-      - name: Upload Cosmic Edition
+      - name: Upload ORBITAL STRIKE
         uses: actions/upload-artifact@v4
         with:
           name: ORBITAL-STRIKE-0.3.0-COSMIC
